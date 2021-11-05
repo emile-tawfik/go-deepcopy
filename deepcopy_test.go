@@ -2,8 +2,9 @@ package deepcopy
 
 import (
 	"fmt"
-	. "reflect"
+	"reflect"
 	"testing"
+	"time"
 )
 
 func ExampleAnything() {
@@ -43,6 +44,51 @@ func ExampleAnything() {
 	// map[string]int(nil)
 }
 
+func ExampleAnythingWithCustomTypes() {
+	tests := []interface{}{
+		`Now cut that out!`,
+		39,
+		true,
+		false,
+		2.14,
+		[]string{
+			"Phil Harris",
+			"Rochester van Jones",
+			"Mary Livingstone",
+			"Dennis Day",
+		},
+		[2]string{
+			"Jell-O",
+			"Grape-Nuts",
+		},
+		[]int(nil),
+		map[string]int(nil),
+		time.Date(2021, time.November, 5, 21, 3, 35, 12, time.UTC),
+	}
+
+	typeMap := TypeMap{
+		reflect.TypeOf(time.Time{}): func(i interface{}) (interface{}, error) {
+			return i.(time.Time), nil
+		},
+	}
+
+	for _, expected := range tests {
+		actual := MustAnythingWithCustomTypes(expected, typeMap)
+		fmt.Printf("%#v\n", actual)
+	}
+	// Output:
+	// "Now cut that out!"
+	// 39
+	// true
+	// false
+	// 2.14
+	// []string{"Phil Harris", "Rochester van Jones", "Mary Livingstone", "Dennis Day"}
+	// [2]string{"Jell-O", "Grape-Nuts"}
+	// []int(nil)
+	// map[string]int(nil)
+	// time.Date(2021, time.November, 5, 21, 3, 35, 12, time.UTC)
+}
+
 type Foo struct {
 	Foo *Foo
 	Bar int
@@ -75,7 +121,7 @@ func ExampleMap() {
 func TestInterface(t *testing.T) {
 	x := []interface{}{nil}
 	y := MustAnything(x).([]interface{})
-	if !DeepEqual(x, y) || len(y) != 1 {
+	if !reflect.DeepEqual(x, y) || len(y) != 1 {
 		t.Errorf("expect %v == %v; y had length %v (expected 1)", x, y, len(y))
 	}
 	var a interface{}
@@ -133,15 +179,15 @@ func TestUnsupportedKindPanicsOnMust(t *testing.T) {
 func TestMismatchedTypesFail(t *testing.T) {
 	tests := []struct {
 		input interface{}
-		kind  Kind
+		kind  reflect.Kind
 	}{
 		{
 			map[int]int{1: 2, 2: 4, 3: 8},
-			Map,
+			reflect.Map,
 		},
 		{
 			[]int{2, 8},
-			Slice,
+			reflect.Slice,
 		},
 	}
 	for _, test := range tests {
@@ -149,7 +195,7 @@ func TestMismatchedTypesFail(t *testing.T) {
 			if kind == test.kind {
 				continue
 			}
-			actual, err := copier(test.input, nil)
+			actual, err := copier(test.input, nil, nil)
 			if actual != nil {
 
 				t.Errorf("%v attempted value %v as %v; should be nil value, got %v", test.kind, test.input, kind, actual)
@@ -182,7 +228,7 @@ func TestTwoNils(t *testing.T) {
 
 	dst := MustAnything(src)
 
-	if !DeepEqual(src, dst) {
+	if !reflect.DeepEqual(src, dst) {
 		t.Errorf("expect %v == %v; ", src, dst)
 	}
 
@@ -204,4 +250,16 @@ func TestStructWithNilSliceAndMAp(*testing.T) {
 	// Output:
 	// <nil>
 	// <nil>
+}
+
+func TestErrorFieldNotCopyable(t *testing.T) {
+	x := time.Date(2021, time.November, 5, 21, 3, 35, 12, time.UTC)
+	y, err := Anything(x)
+	if err == nil || y != nil {
+		t.Fatalf("Should have an error")
+	}
+	strError := `can't copy type time.Time cause of field wall`
+	if err.Error() != strError {
+		t.Fatalf("Wrong error got %#v want %#v", err.Error(), strError)
+	}
 }
