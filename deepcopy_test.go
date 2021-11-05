@@ -8,7 +8,7 @@ import (
 
 func ExampleAnything() {
 	tests := []interface{}{
-		`"Now cut that out!"`,
+		`Now cut that out!`,
 		39,
 		true,
 		false,
@@ -23,11 +23,13 @@ func ExampleAnything() {
 			"Jell-O",
 			"Grape-Nuts",
 		},
+		[]int(nil),
+		map[string]int(nil),
 	}
 
 	for _, expected := range tests {
 		actual := MustAnything(expected)
-		fmt.Println(actual)
+		fmt.Printf("%#v\n", actual)
 	}
 	// Output:
 	// "Now cut that out!"
@@ -35,8 +37,10 @@ func ExampleAnything() {
 	// true
 	// false
 	// 2.14
-	// [Phil Harris Rochester van Jones Mary Livingstone Dennis Day]
-	// [Jell-O Grape-Nuts]
+	// []string{"Phil Harris", "Rochester van Jones", "Mary Livingstone", "Dennis Day"}
+	// [2]string{"Jell-O", "Grape-Nuts"}
+	// []int(nil)
+	// map[string]int(nil)
 }
 
 type Foo struct {
@@ -47,21 +51,25 @@ type Foo struct {
 func ExampleMap() {
 	x := map[string]*Foo{
 		"foo": &Foo{Bar: 1},
-		"bar": &Foo{Bar: 2},
+		"bar": &Foo{Bar: 2, Foo: &Foo{Bar: 3}},
 	}
 	y := MustAnything(x).(map[string]*Foo)
 	for _, k := range []string{"foo", "bar"} { // to ensure consistent order
 		fmt.Printf("x[\"%v\"] = y[\"%v\"]: %v\n", k, k, x[k] == y[k])
 		fmt.Printf("x[\"%v\"].Foo = y[\"%v\"].Foo: %v\n", k, k, x[k].Foo == y[k].Foo)
 		fmt.Printf("x[\"%v\"].Bar = y[\"%v\"].Bar: %v\n", k, k, x[k].Bar == y[k].Bar)
+		if x[k].Foo != nil {
+			fmt.Printf("x[\"%v\"].Foo.Bar = y[\"%v\"].Foo.Bar: %v\n", k, k, x[k].Foo.Bar == y[k].Foo.Bar)
+		}
 	}
 	// Output:
 	// x["foo"] = y["foo"]: false
-	// x["foo"].Foo = y["foo"].Foo: false
+	// x["foo"].Foo = y["foo"].Foo: true
 	// x["foo"].Bar = y["foo"].Bar: true
 	// x["bar"] = y["bar"]: false
 	// x["bar"].Foo = y["bar"].Foo: false
 	// x["bar"].Bar = y["bar"].Bar: true
+	// x["bar"].Foo.Bar = y["bar"].Foo.Bar: true
 }
 
 func TestInterface(t *testing.T) {
@@ -161,8 +169,8 @@ func TestTwoNils(t *testing.T) {
 		B int
 	}
 	type FooBar struct {
-		Foo *Foo
-		Bar *Bar
+		Foo  *Foo
+		Bar  *Bar
 		Foo2 *Foo
 		Bar2 *Bar
 	}
@@ -178,4 +186,22 @@ func TestTwoNils(t *testing.T) {
 		t.Errorf("expect %v == %v; ", src, dst)
 	}
 
+}
+
+type TestNilSliceAndMap struct {
+	Slice []int
+	Map   map[int]int
+}
+
+func TestStructWithNilSliceAndMAp(*testing.T) {
+	x := &TestNilSliceAndMap{
+		Slice: nil,
+		Map:   nil,
+	}
+	y := MustAnything(x).(*TestNilSliceAndMap)
+	fmt.Println(y)
+
+	// Output:
+	// <nil>
+	// <nil>
 }

@@ -86,6 +86,9 @@ func _slice(x interface{}, ptrs map[uintptr]interface{}) (interface{}, error) {
 		return nil, fmt.Errorf("must pass a value with kind of Slice; got %v", v.Kind())
 	}
 	// Create a new slice and, for each item in the slice, make a deep copy of it.
+	if v.IsNil() {
+		return x, nil
+	}
 	size := v.Len()
 	t := TypeOf(x)
 	dc := MakeSlice(t, size, size)
@@ -106,6 +109,9 @@ func _map(x interface{}, ptrs map[uintptr]interface{}) (interface{}, error) {
 	v := ValueOf(x)
 	if v.Kind() != Map {
 		return nil, fmt.Errorf("must pass a value with kind of Map; got %v", v.Kind())
+	}
+	if v.IsNil() {
+		return x, nil
 	}
 	t := TypeOf(x)
 	dc := MakeMapWithSize(t, v.Len())
@@ -132,7 +138,7 @@ func _pointer(x interface{}, ptrs map[uintptr]interface{}) (interface{}, error) 
 
 	if v.IsNil() {
 		t := TypeOf(x)
-		return Zero(t).Interface(),nil
+		return Zero(t).Interface(), nil
 	}
 
 	addr := v.Pointer()
@@ -142,7 +148,7 @@ func _pointer(x interface{}, ptrs map[uintptr]interface{}) (interface{}, error) 
 	t := TypeOf(x)
 	dc := New(t.Elem())
 	ptrs[addr] = dc.Interface()
-	
+
 	item, err := _anything(v.Elem().Interface(), ptrs)
 	if err != nil {
 		return nil, fmt.Errorf("failed to copy the value under the pointer %v: %v", v, err)
@@ -151,7 +157,7 @@ func _pointer(x interface{}, ptrs map[uintptr]interface{}) (interface{}, error) 
 	if iv.IsValid() {
 		dc.Elem().Set(ValueOf(item))
 	}
-	
+
 	return dc.Interface(), nil
 }
 
